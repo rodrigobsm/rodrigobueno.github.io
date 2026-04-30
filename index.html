@@ -109,6 +109,13 @@
       background-size: 48px 48px;
     }
 
+    #net-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
     /* ── Layout ───────────────────────────────────────────────── */
     .page {
       position: relative;
@@ -615,6 +622,7 @@
     <div class="blob b3"></div>
   </div>
   <div class="grid-layer"></div>
+  <canvas id="net-canvas"></canvas>
 
   <!-- Page -->
   <div class="page">
@@ -629,7 +637,7 @@
           <div class="avatar-gap"></div>
           <img
             class="avatar"
-            src="https://ugc.production.linktr.ee/a8ef6efb-ec09-4e47-9243-40a56f1c0e74_Perfil.png?io=true&size=avatar-v3_0"
+            src="profile.jpg"
             alt="Rodrigo Bueno"
             loading="eager"
           >
@@ -794,37 +802,236 @@
   </div><!-- /.page -->
 
   <script>
-    function downloadVCard() {
-      var vcard = [
-        'BEGIN:VCARD',
-        'VERSION:3.0',
-        'FN:Rodrigo Bueno',
-        'N:Bueno;Rodrigo;;;',
-        'ORG:TravusTech',
-        'TITLE:IA p/ Negócios',
-        'TEL;TYPE=CELL,VOICE:+17706522439',
-        'EMAIL;TYPE=WORK,INTERNET:rodrigo@travustech.ai',
-        'URL;TYPE=pref:https://rodrigobueno.me',
-        'URL:https://travustech.ai',
-        'X-SOCIALPROFILE;type=instagram:https://instagram.com/rodrigobueno.me',
-        'X-SOCIALPROFILE;type=linkedin:https://www.linkedin.com/in/rodrigobsm/',
-        'X-SOCIALPROFILE;type=tiktok:https://www.tiktok.com/@rodrigobueno.me',
-        'X-SOCIALPROFILE;type=youtube:https://www.youtube.com/@RodrigoBueno-me',
-        'X-SOCIALPROFILE;type=facebook:https://www.facebook.com/rodrigobueno.mee',
-        'PHOTO;VALUE=URI:https://ugc.production.linktr.ee/a8ef6efb-ec09-4e47-9243-40a56f1c0e74_Perfil.png',
-        'NOTE:IA aplicada ao mundo real. Negócios e tecnologia nos EUA. +20 anos em IT. Founder @travustech e @nutriscan360.',
-        'END:VCARD'
-      ].join('\r\n');
+    /* ── Network animation ────────────────────────────────────── */
+    (function () {
+      var canvas = document.getElementById('net-canvas');
+      var ctx    = canvas.getContext('2d');
+      var mouse  = { x: -9999, y: -9999 };
+      var pulses = [];
+      var W, H, nodes, NUM, lastPulse = 0;
 
-      var blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
-      var url  = URL.createObjectURL(blob);
-      var a    = document.createElement('a');
-      a.href     = url;
-      a.download = 'rodrigo-bueno.vcf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+
+      function makeNodes() {
+        NUM   = W < 600 ? 38 : 65;
+        nodes = [];
+        for (var i = 0; i < NUM; i++) {
+          nodes.push({
+            x:  Math.random() * W,
+            y:  Math.random() * H,
+            vx: (Math.random() - .5) * .32,
+            vy: (Math.random() - .5) * .32,
+            r:  Math.random() * .9 + .6
+          });
+        }
+      }
+
+      resize();
+      makeNodes();
+
+      window.addEventListener('resize', function () { resize(); makeNodes(); });
+      window.addEventListener('mousemove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+      window.addEventListener('touchmove',  function (e) { mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; }, { passive: true });
+      window.addEventListener('touchend',   function ()  { mouse.x = -9999; mouse.y = -9999; });
+
+      var MAX_DIST     = 155;
+      var MOUSE_RADIUS = 110;
+
+      function spawnPulse() {
+        for (var t = 0; t < 25; t++) {
+          var a = nodes[Math.floor(Math.random() * NUM)];
+          var b = nodes[Math.floor(Math.random() * NUM)];
+          if (a === b) continue;
+          var dx = a.x - b.x, dy = a.y - b.y;
+          if (Math.sqrt(dx*dx + dy*dy) < MAX_DIST) {
+            pulses.push({ a: a, b: b, t: 0, speed: .012 + Math.random() * .010 });
+            return;
+          }
+        }
+      }
+
+      function animate(ts) {
+        ctx.clearRect(0, 0, W, H);
+
+        /* move nodes */
+        for (var i = 0; i < NUM; i++) {
+          var n  = nodes[i];
+          var mx = n.x - mouse.x, my = n.y - mouse.y;
+          var md = Math.sqrt(mx*mx + my*my);
+          if (md < MOUSE_RADIUS && md > 0) {
+            var f = (MOUSE_RADIUS - md) / MOUSE_RADIUS * .38;
+            n.vx += mx / md * f;
+            n.vy += my / md * f;
+          }
+          var sp = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
+          if (sp > 1.1) { n.vx *= .94; n.vy *= .94; }
+          n.x += n.vx;  n.y += n.vy;
+          if (n.x < 0)  { n.x = 0;  n.vx =  Math.abs(n.vx); }
+          if (n.x > W)  { n.x = W;  n.vx = -Math.abs(n.vx); }
+          if (n.y < 0)  { n.y = 0;  n.vy =  Math.abs(n.vy); }
+          if (n.y > H)  { n.y = H;  n.vy = -Math.abs(n.vy); }
+        }
+
+        /* draw edges */
+        for (var i = 0; i < NUM; i++) {
+          for (var j = i + 1; j < NUM; j++) {
+            var dx   = nodes[i].x - nodes[j].x;
+            var dy   = nodes[i].y - nodes[j].y;
+            var dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < MAX_DIST) {
+              ctx.beginPath();
+              ctx.moveTo(nodes[i].x, nodes[i].y);
+              ctx.lineTo(nodes[j].x, nodes[j].y);
+              ctx.strokeStyle = 'rgba(59,130,246,' + ((1 - dist / MAX_DIST) * .11) + ')';
+              ctx.lineWidth   = .55;
+              ctx.stroke();
+            }
+          }
+        }
+
+        /* draw nodes */
+        for (var i = 0; i < NUM; i++) {
+          ctx.beginPath();
+          ctx.arc(nodes[i].x, nodes[i].y, nodes[i].r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(96,165,250,.30)';
+          ctx.fill();
+        }
+
+        /* spawn & draw pulses */
+        if (ts - lastPulse > 1600) { spawnPulse(); lastPulse = ts; }
+
+        for (var i = pulses.length - 1; i >= 0; i--) {
+          var p  = pulses[i];
+          p.t   += p.speed;
+          if (p.t > 1) { pulses.splice(i, 1); continue; }
+
+          var dx = p.b.x - p.a.x, dy = p.b.y - p.a.y;
+          if (Math.sqrt(dx*dx + dy*dy) >= MAX_DIST) { pulses.splice(i, 1); continue; }
+
+          var px   = p.a.x + dx * p.t;
+          var py   = p.a.y + dy * p.t;
+          var fade = Math.sin(p.t * Math.PI);
+
+          var g = ctx.createRadialGradient(px, py, 0, px, py, 7);
+          g.addColorStop(0, 'rgba(147,197,253,' + (fade * .75) + ')');
+          g.addColorStop(1, 'rgba(147,197,253,0)');
+          ctx.beginPath();
+          ctx.arc(px, py, 7, 0, Math.PI * 2);
+          ctx.fillStyle = g;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(219,234,254,' + (fade * .95) + ')';
+          ctx.fill();
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      requestAnimationFrame(animate);
+    }());
+
+    /* ── vCard ────────────────────────────────────────────────── */
+    function downloadVCard() {
+      var btn     = document.querySelector('.save-btn');
+      var titleEl = btn.querySelector('.link-title');
+      var subEl   = btn.querySelector('.link-sub');
+
+      titleEl.textContent = 'Gerando contato…';
+      subEl.textContent   = 'Baixando foto de perfil';
+      btn.style.pointerEvents = 'none';
+
+      function restore() {
+        titleEl.textContent = 'Salvar Contato';
+        subEl.textContent   = 'Adicionar à agenda do celular (.vcf)';
+        btn.style.pointerEvents = '';
+      }
+
+      function foldLine(line) {
+        /* vCard 3.0 line folding: max 75 octets, continuation lines start with a space */
+        if (line.length <= 75) return line;
+        var out  = line.substring(0, 75);
+        var rest = line.substring(75);
+        while (rest.length > 0) {
+          out  += '\r\n ' + rest.substring(0, 74);
+          rest  = rest.substring(74);
+        }
+        return out;
+      }
+
+      function buildAndDownload(base64, imgType) {
+        var lines = [
+          'BEGIN:VCARD',
+          'VERSION:3.0',
+          'FN:Rodrigo Bueno',
+          'N:Bueno;Rodrigo;;;',
+          'ORG:TravusTech',
+          'TITLE:IA p/ Negócios',
+          'TEL;TYPE=CELL,VOICE:+17706522439',
+          'EMAIL;TYPE=WORK,INTERNET:rodrigo@travustech.ai',
+          'URL;TYPE=pref:https://rodrigobueno.me',
+          'URL:https://travustech.ai',
+          'X-SOCIALPROFILE;type=instagram:https://instagram.com/rodrigobueno.me',
+          'X-SOCIALPROFILE;type=linkedin:https://www.linkedin.com/in/rodrigobsm/',
+          'X-SOCIALPROFILE;type=tiktok:https://www.tiktok.com/@rodrigobueno.me',
+          'X-SOCIALPROFILE;type=youtube:https://www.youtube.com/@RodrigoBueno-me',
+          'X-SOCIALPROFILE;type=facebook:https://www.facebook.com/rodrigobueno.mee',
+          'NOTE:IA aplicada ao mundo real. Negócios e tecnologia nos EUA. +20 anos em IT. Founder @travustech e @nutriscan360.',
+        ];
+
+        if (base64 && imgType) {
+          lines.push(foldLine('PHOTO;ENCODING=b;TYPE=' + imgType + ':' + base64));
+        } else {
+          lines.push('PHOTO;VALUE=URI:https://ugc.production.linktr.ee/a8ef6efb-ec09-4e47-9243-40a56f1c0e74_Perfil.png');
+        }
+
+        lines.push('END:VCARD');
+
+        var vcf  = lines.join('\r\n');
+        var blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'rodrigo-bueno.vcf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        restore();
+      }
+
+      var imgUrl = 'profile.jpg';
+
+      fetch(imgUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('fetch failed');
+          return res.blob();
+        })
+        .then(function(imgBlob) {
+          return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onloadend = function() {
+              var dataUrl   = reader.result;
+              var base64    = dataUrl.split(',')[1];
+              var mimeMatch = dataUrl.match(/^data:image\/(\w+);/);
+              var imgType   = mimeMatch ? mimeMatch[1].toUpperCase() : 'JPEG';
+              resolve({ base64: base64, imgType: imgType });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(imgBlob);
+          });
+        })
+        .then(function(photo) {
+          buildAndDownload(photo.base64, photo.imgType);
+        })
+        .catch(function() {
+          /* CORS bloqueou — gera o vCard sem foto embutida */
+          buildAndDownload(null, null);
+        });
     }
   </script>
 </body>
