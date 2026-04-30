@@ -322,13 +322,13 @@
 
     .social-row {
       display: flex;
-      justify-content: center;
-      gap: .65rem;
+      gap: .55rem;
+      margin-bottom: 1.25rem;
     }
 
     .soc-btn {
-      width: 46px;
-      height: 46px;
+      flex: 1;
+      aspect-ratio: 1 / 1;
       border-radius: 14px;
       background: rgba(59,130,246,.07);
       border: 1px solid var(--border);
@@ -609,7 +609,7 @@
       .page { padding: 2rem 1rem 3rem; }
       .card { padding: 2rem 1.5rem; border-radius: 22px; }
       .name { font-size: 1.65rem; }
-      .soc-btn { width: 42px; height: 42px; border-radius: 12px; }
+      .soc-btn { border-radius: 12px; }
     }
   </style>
 </head>
@@ -662,7 +662,7 @@
       </div>
 
       <!-- ── Social icons ── -->
-      <div class="divider"></div>
+      <div class="section-label">Me Siga</div>
 
       <div class="social-row">
 
@@ -702,8 +702,6 @@
         </a>
 
       </div>
-
-      <div class="divider"></div>
 
       <!-- ── Save Contact ── -->
       <button class="save-btn" onclick="downloadVCard()" aria-label="Salvar contato">
